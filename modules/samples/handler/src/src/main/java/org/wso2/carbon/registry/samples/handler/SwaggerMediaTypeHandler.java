@@ -17,6 +17,7 @@ public class SwaggerMediaTypeHandler extends Handler {
 
 	private String swaggerVersion = CommonConstants.DEFAULT_SWAGGER_VERSION;
 	private String swaggerMediaType = "application/swagger+json";
+	private String swaggerDefinitionUrl;
 
 	public void put(RequestContext requestContext) throws RegistryException {
 
@@ -33,36 +34,27 @@ public class SwaggerMediaTypeHandler extends Handler {
 		byte[] content = (byte[]) resource.getContent();
 		ByteArrayInputStream in = new ByteArrayInputStream(content);
 
-		OMElement apiDefinition;
+		OMElement metadata;
 		try {
 			StAXOMBuilder builder = new StAXOMBuilder(in);
-			apiDefinition = builder.getDocumentElement();
-		} catch (Exception ae) {
+			metadata = builder.getDocumentElement();
+		} catch (Exception e) {
 			throw new RegistryException("Failed to parse the rest api.");
 		}
 
-		OMElement titleElement = apiDefinition.getFirstChildWithName(new QName("title"));
+		OMElement overview = metadata.getFirstChildWithName(new QName(CommonConstants.METADATA_NAMESPACE_URL,"overview"));
 
-		if (titleElement == null) {
-			throw new RegistryException("API title cannot be NULL.");
-		}
-		OMElement descElement = apiDefinition.getFirstChildWithName(new QName("description"));
-
-		if (descElement != null) {
-			resource.setDescription(descElement.getText());
-		}
-		OMElement uriElement =
-				apiDefinition.getFirstChildWithName(new QName("swaggerDefinitionURL"));
-
-		if (uriElement == null) {
-			throw new RegistryException("API definition URL cannot be null.");
+		if(overview == null) {
+			throw new RegistryException("Resource metadata cannot be null.");
 		}
 
-		resource.setProperty("Resource Path", resourcePath);
+		OMElement urlElement = overview.getFirstChildWithName(new QName(CommonConstants.METADATA_NAMESPACE_URL,"swaggerDefinitionURL"));
+		this.swaggerDefinitionUrl = urlElement.getText();
+
+		resource.setProperty("Swagger Definition URL", this.swaggerDefinitionUrl);
 		resource.setProperty("Created at",
 		                     requestContext.getResource().getCreatedTime().toString());
 		requestContext.getRepository().put(resourcePath, resource);
-		registry.applyTag(resourcePath, "complete");
 		requestContext.setProcessingComplete(true);
 	}
 }

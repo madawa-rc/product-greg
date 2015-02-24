@@ -1,5 +1,6 @@
 package org.wso2.carbon.registry.samples.handler;
 
+import org.apache.axiom.om.OMElement;
 import org.wso2.carbon.registry.common.utils.artifact.manager.ArtifactManager;
 import org.wso2.carbon.registry.core.Registry;
 import org.wso2.carbon.registry.core.RegistryConstants;
@@ -12,6 +13,7 @@ import org.wso2.carbon.registry.core.jdbc.handlers.RequestContext;
 import org.wso2.carbon.registry.core.utils.RegistryUtils;
 import org.wso2.carbon.registry.extensions.utils.CommonUtil;
 
+import javax.xml.namespace.QName;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -21,9 +23,32 @@ import java.util.*;
 
 public class SwaggerMediaTypeHandler extends Handler {
 
-	public static final String SWAGGER_VERSION_DEFAULT_VALUE = "1.0.0";
+	public static final String API_VERSION_DEFAULT_VALUE = "1.0.0";
 
 	private String location = "/swaggers/";
+	private String locationTag = "location";
+	private OMElement locationConfiguration;
+
+	public OMElement getSwaggerLocationConfiguration() {
+		return locationConfiguration;
+	}
+
+	public void setSwaggerLocationConfiguration(OMElement locationConfiguration) throws RegistryException {
+		Iterator confElements = locationConfiguration.getChildElements();
+		while (confElements.hasNext()) {
+			OMElement confElement = (OMElement)confElements.next();
+			if (confElement.getQName().equals(new QName(locationTag))) {
+				location = confElement.getText();
+				if (!location.startsWith(RegistryConstants.PATH_SEPARATOR)) {
+					location = RegistryConstants.PATH_SEPARATOR + location;
+				}
+				if (!location.endsWith(RegistryConstants.PATH_SEPARATOR)) {
+					location = location + RegistryConstants.PATH_SEPARATOR;
+				}
+			}
+		}
+		this.locationConfiguration = locationConfiguration;
+	}
 
 	@Override public void put(RequestContext requestContext) throws RegistryException {
 		if (!CommonUtil.isUpdateLockAvailable()) {
@@ -40,7 +65,7 @@ public class SwaggerMediaTypeHandler extends Handler {
 			Registry registry = requestContext.getRegistry();
 
 			Object resourceContentObj = resource.getContent();
-			String resourceContent; // here the resource content is url
+			String resourceContent;
 			if (resourceContentObj instanceof String) {
 				resourceContent = (String)resourceContentObj;
 				resource.setContent(RegistryUtils.encodeString(resourceContent));
@@ -61,7 +86,7 @@ public class SwaggerMediaTypeHandler extends Handler {
 				//log.error(msg, e);
 				throw new RegistryException(msg, e);
 			}
-			Object newContent = RegistryUtils.encodeString((String)resourceContent);
+			Object newContent = RegistryUtils.encodeString(resourceContent);
 			if (newContent != null) {
 				InputStream inputStream = new ByteArrayInputStream((byte[])newContent);
 				addSwaggerToRegistry(requestContext, inputStream);
@@ -105,15 +130,16 @@ public class SwaggerMediaTypeHandler extends Handler {
 		Resource swaggerResource;
 		if (requestContext.getResource() == null) {
 			swaggerResource = new ResourceImpl();
-			//swaggerResource.setMediaType("application/swagger+json");
+			swaggerResource.setMediaType("application/swagger+json");
 		} else {
 			swaggerResource = requestContext.getResource();
 		}
 
 		String version =
 				requestContext.getResource().getProperty(RegistryConstants.VERSION_PARAMETER_NAME);
+		String apiName = requestContext.getResource().getProperty("apiName");
 		if (version == null) {
-			version = SWAGGER_VERSION_DEFAULT_VALUE;
+			version = API_VERSION_DEFAULT_VALUE;
 			requestContext.getResource()
 			              .setProperty(RegistryConstants.VERSION_PARAMETER_NAME, version);
 		}
@@ -150,7 +176,7 @@ public class SwaggerMediaTypeHandler extends Handler {
 		                                               RegistryConstants.PATH_SEPARATOR + swaggerFileName))) {
 			swaggerPath = resourcePath;
 		} else {
-			swaggerPath = commonLocation + version + "/" + swaggerFileName;
+			swaggerPath = commonLocation + apiName + "/" + version + "/" + swaggerFileName;
 		}
 
 		String relativeArtifactPath = RegistryUtils.getRelativePath(registry.getRegistryContext(), swaggerPath);
@@ -181,13 +207,12 @@ public class SwaggerMediaTypeHandler extends Handler {
 			}
 		}
 
-		newResource.setMediaType("text/plain");
-		String policyId = swaggerResource.getUUID();
-		if (policyId == null) {
-			// generate a service id
-			policyId = UUID.randomUUID().toString();
+		newResource.setMediaType("application/swagger+json");
+		String swaggerResourceUUID = swaggerResource.getUUID();
+		if (swaggerResourceUUID == null) {
+			swaggerResourceUUID = UUID.randomUUID().toString();
 		}
-		newResource.setUUID(policyId);
+		newResource.setUUID(swaggerResourceUUID);
 		newResource.setContent(new String(outputStream.toByteArray()));
 		addSwaggerToRegistry(requestContext, swaggerPath, requestContext.getSourceURL(),
 		                     newResource, registry);

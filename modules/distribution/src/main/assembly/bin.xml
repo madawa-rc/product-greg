@@ -390,6 +390,11 @@
         </fileSet>
 
         <fileSet>
+            <directory>../p2-profile-gen/target/wso2carbon-core-${carbon.kernel.version}/repository/resources/publisher/asset/swagger</directory>
+            <outputDirectory>${pom.artifactId}-${pom.version}/repository/deployment/server/jaggeryapps/publisher/extensions/assets/swagger</outputDirectory>
+        </fileSet>
+
+        <fileSet>
             <directory>../p2-profile-gen/target/wso2carbon-core-${carbon.kernel.version}/repository/resources/publisher/asset/schema</directory>
             <outputDirectory>${pom.artifactId}-${pom.version}/repository/deployment/server/jaggeryapps/publisher/extensions/assets/schema</outputDirectory>
         </fileSet>
